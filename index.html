@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OceanEmbed AI | 3D Subsurface Ocean Temperature Reconstruction (MoES)</title>
+  <meta name="description" content="AI Deep Learning Framework for Reconstructing 3D Subsurface Ocean Profiles from 2D Satellite Observations (SST/SSH) - MoES SIH26066" />
+  
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Plotly.js for 3D & 2D Scientific Visualizations -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo-icon">
+        <i data-lucide="waves" class="logo-svg"></i>
+      </div>
+      <div>
+        <div class="brand-title">OceanEmbed <span class="badge-ai">AI 3D CORE</span></div>
+        <div class="brand-subtitle">Ministry of Earth Sciences (MoES) &bull; SIH 26066 Global Subsurface Reconstruction</div>
+      </div>
+    </div>
+    
+    <div class="header-status-group">
+      <div class="status-pill online">
+        <span class="pulse-dot"></span>
+        <span id="backendStatus">NetCDF Engine Live</span>
+      </div>
+      <div class="system-stats-pill">
+        <i data-lucide="cpu" class="pill-icon"></i>
+        <span>ResU-Net (40 Depths &bull; 0–2000m)</span>
+      </div>
+      <a href="#quickDocsModal" class="btn-icon" title="Architecture & Model Info" id="openDocsBtn">
+        <i data-lucide="info"></i>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Application Grid -->
+  <div class="app-layout">
+    <!-- Left Sidebar: Command Center -->
+    <aside class="sidebar" id="commandCenter">
+      <div class="sidebar-header">
+        <div class="section-title">
+          <i data-lucide="sliders" class="title-icon"></i>
+          <span>Command Center</span>
+        </div>
+        <span class="badge-tag">CMEMS L4</span>
+      </div>
+
+      <!-- Coordinate Input Mode -->
+      <div class="control-group">
+        <label class="control-label">Preset Ocean Regions</label>
+        <div class="preset-pills">
+          <button class="preset-btn active" data-lat="15.0" data-lon="88.0" data-name="Bay of Bengal (Cyclone Alley)">Bay of Bengal</button>
+          <button class="preset-btn" data-lat="12.0" data-lon="65.0" data-name="Arabian Sea (Warm Pool)">Arabian Sea</button>
+          <button class="preset-btn" data-lat="-5.0" data-lon="80.0" data-name="Equatorial Indian Ocean">Eq. Indian Ocean</button>
+          <button class="preset-btn" data-lat="25.0" data-lon="-71.0" data-name="Gulf Stream / Atlantic">Gulf Stream</button>
+          <button class="preset-btn" data-lat="0.0" data-lon="-140.0" data-name="Equatorial Pacific (El Niño / ENSO)">Pacific Niño 3.4</button>
+          <button class="preset-btn" data-lat="-55.0" data-lon="20.0" data-name="Southern Ocean (Antarctic Circumpolar)">Southern Ocean</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">Target Geospatial Coordinates</label>
+        <div class="coord-inputs-row">
+          <div class="input-field">
+            <span class="input-prefix">LAT</span>
+            <input type="number" id="latInput" value="15.0" step="0.1" min="-80" max="80" />
+            <span class="input-suffix">°N</span>
+          </div>
+          <div class="input-field">
+            <span class="input-prefix">LON</span>
+            <input type="number" id="lonInput" value="88.0" step="0.1" min="-180" max="180" />
+            <span class="input-suffix">°E</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">Observation Date (Reanalysis Period)</label>
+        <input type="date" id="dateInput" value="2026-06-23" class="date-picker-input" />
+      </div>
+
+      <button id="runInferenceBtn" class="cta-button primary-cta">
+        <i data-lucide="zap" class="cta-icon"></i>
+        <span>Execute 3D Subsurface Inference</span>
+      </button>
+
+      <!-- Ocean Hazard Live Card -->
+      <div class="hazard-card" id="hazardCard">
+        <div class="hazard-header">
+          <span class="hazard-label"><i data-lucide="alert-triangle"></i> Cyclone Intensification Risk</span>
+          <span class="hazard-badge" id="hazardBadge">CALCULATING</span>
+        </div>
+        <div class="tchp-meter">
+          <div class="tchp-bar" id="tchpBar" style="width: 65%;"></div>
+        </div>
+        <div class="hazard-metrics-row">
+          <div>
+            <div class="metric-tiny-label">TCHP (Heat Potential)</div>
+            <div class="metric-highlight" id="tchpValue">-- <small>kJ/cm²</small></div>
+          </div>
+          <div>
+            <div class="metric-tiny-label">26°C Isotherm Depth</div>
+            <div class="metric-highlight" id="d26Value">-- <small>m</small></div>
+          </div>
+        </div>
+        <div class="mhw-status-row">
+          <span class="text-muted">Marine Heatwave:</span>
+          <span id="mhwValue" class="fw-600 text-warning">Checking...</span>
+        </div>
+      </div>
+
+      <!-- Export Data Module -->
+      <div class="export-module">
+        <label class="control-label"><i data-lucide="download"></i> Export Reconstruction Profile</label>
+        <div class="export-btn-group">
+          <button id="exportCsvBtn" class="btn-secondary">
+            <i data-lucide="file-spreadsheet"></i> CSV Table
+          </button>
+          <button id="exportNcBtn" class="btn-secondary">
+            <i data-lucide="database"></i> NetCDF (.nc)
+          </button>
+        </div>
+      </div>
+
+      <!-- Real-time Satellite Telemetry Summary -->
+      <div class="telemetry-box">
+        <div class="telemetry-title"><i data-lucide="activity"></i> Satellite L4 Telemetry</div>
+        <div class="telemetry-grid">
+          <div class="tel-item">
+            <span class="tel-name">SST (Sea Temp)</span>
+            <span class="tel-val" id="telSST">-- °C</span>
+          </div>
+          <div class="tel-item">
+            <span class="tel-name">SSH (Anomaly)</span>
+            <span class="tel-val" id="telSSH">-- m</span>
+          </div>
+          <div class="tel-item">
+            <span class="tel-name">Mixed Layer (MLD)</span>
+            <span class="tel-val" id="telMLD">-- m</span>
+          </div>
+          <div class="tel-item">
+            <span class="tel-name">Wave Height (Hs)</span>
+            <span class="tel-val" id="telWave">-- m</span>
+          </div>
+          <div class="tel-item">
+            <span class="tel-name">Wind Speed</span>
+            <span class="tel-val" id="telWind">-- m/s</span>
+          </div>
+          <div class="tel-item">
+            <span class="tel-name">Salinity</span>
+            <span class="tel-val" id="telSal">-- PSU</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Section 1: Global 2D Satellite Observation Map -->
+      <section class="card-panel map-panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <i data-lucide="globe" class="panel-icon"></i>
+            <div>
+              <h3>2D Sea Surface Temperature & Global Coverage Map</h3>
+              <p class="panel-desc">Click anywhere on the ocean or drag marker to run 3D depth profile reconstruction</p>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="layer-toggle-btn active" id="toggleHeatmapBtn">
+              <i data-lucide="layers"></i> CMEMS L4 SST Layer
+            </button>
+            <div class="badge-coords" id="selectedCoordBadge">
+              15.00°N, 88.00°E
+            </div>
+          </div>
+        </div>
+
+        <div class="map-container-wrapper">
+          <div id="oceanMap" class="interactive-map"></div>
+          <!-- Floating Legend -->
+          <div class="map-floating-legend">
+            <span class="legend-title">Sea Surface Temp (°C)</span>
+            <div class="legend-gradient-bar"></div>
+            <div class="legend-labels">
+              <span>0°C (Polar)</span>
+              <span>15°C</span>
+              <span>25°C</span>
+              <span>32°C (Tropical)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Subsurface Vertical Analytics (Thermocline Reconstructed) -->
+      <section class="card-panel analytics-panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <i data-lucide="layers" class="panel-icon"></i>
+            <div>
+              <h3>3D Subsurface Thermocline Reconstruction (0m &rarr; 2000m Depth)</h3>
+              <p class="panel-desc">Channel-to-Depth ResU-Net AI vs. Physical In-Situ Argo Float Benchmark Validation</p>
+            </div>
+          </div>
+          <div class="view-switch-group">
+            <button class="view-btn active" id="view1DBtn"><i data-lucide="trending-down"></i> Thermocline Profile</button>
+            <button class="view-btn" id="view3DBtn"><i data-lucide="box"></i> 3D Volumetric Water Column</button>
+            <button class="view-btn" id="viewTableBtn"><i data-lucide="table"></i> 40-Depth Matrix</button>
+          </div>
+        </div>
+
+        <div class="chart-content-wrapper">
+          <!-- 1D Vertical Thermocline Profile -->
+          <div id="profilePlotContainer" class="plot-container active">
+            <div id="thermoclinePlot" class="plotly-chart"></div>
+          </div>
+
+          <!-- 3D Volumetric Surface Visualizer -->
+          <div id="volumetricPlotContainer" class="plot-container">
+            <div id="volumetricPlot" class="plotly-chart"></div>
+          </div>
+
+          <!-- 40-Depth Matrix Table -->
+          <div id="tableContainer" class="plot-container">
+            <div class="table-scroll">
+              <table class="depth-matrix-table" id="depthMatrixTable">
+                <thead>
+                  <tr>
+                    <th>Depth Level (m)</th>
+                    <th>Predicted Temp (°C)</th>
+                    <th>Argo Benchmark (°C)</th>
+                    <th>Residual Error (ΔT)</th>
+                    <th>Confidence (1-σ)</th>
+                    <th>Thermal Zone</th>
+                  </tr>
+                </thead>
+                <tbody id="depthTableBody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metric Badges Bottom Strip -->
+        <div class="analytics-footer-strip">
+          <div class="footer-stat">
+            <span class="stat-label">Model Architecture</span>
+            <span class="stat-value">Channel-to-Depth ResU-Net</span>
+          </div>
+          <div class="footer-stat">
+            <span class="stat-label">Inference Latency</span>
+            <span class="stat-value text-accent" id="inferenceLatency">14.8 ms (Real-time)</span>
+          </div>
+          <div class="footer-stat">
+            <span class="stat-label">Root Mean Square Error (RMSE)</span>
+            <span class="stat-value text-success" id="rmseStat">&plusmn; 0.21 °C</span>
+          </div>
+          <div class="footer-stat">
+            <span class="stat-label">Depth Slices Generated</span>
+            <span class="stat-value">40 Standard Levels</span>
+          </div>
+          <div class="footer-stat">
+            <span class="stat-label">Max Penetration</span>
+            <span class="stat-value">2000 Meters Abyssal</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Documentation / About Modal -->
+  <div class="modal-backdrop" id="docsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="cpu" class="text-accent"></i>
+          <span>About OceanEmbed Deep Learning Subsurface Reconstructor</span>
+        </div>
+        <button class="modal-close-btn" id="closeDocsBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4>1. Hackathon Objective & MoES Problem Statement</h4>
+        <p>Current ocean monitoring relies on sparse Argo floats (~4000 globally) leaving massive geographic blind spots. Satellites capture 100% surface observations (SST, SSH) but cannot penetrate deep water. OceanEmbed reconstructs continuous 3D temperature grids (0–2000m) from 2D satellite observations in real-time.</p>
+        
+        <h4>2. Channel-to-Depth ResU-Net Architecture</h4>
+        <ul>
+          <li><strong>Input:</strong> 2D Satellite NetCDF arrays (Sea Surface Temperature &theta;<sub>o</sub>, Sea Surface Height &zeta;, MLD, Salinity).</li>
+          <li><strong>Encoder:</strong> Modified ResNet-18 extracting spatial mesoscale eddy features.</li>
+          <li><strong>Decoder:</strong> Transposed Conv mapping 2D surface anomalies into 40 distinct depth channels.</li>
+          <li><strong>Loss:</strong> Depth-weighted MSE penalizing upper-ocean errors where thermal gradients are steepest.</li>
+        </ul>
+
+        <h4>3. Cyclone & Ocean Heat Potential (TCHP)</h4>
+        <p>The app computes integrated Tropical Cyclone Heat Potential (kJ/cm²) down to the 26°C isotherm, delivering mission-critical early warning intelligence for MoES and IMD cyclone tracking.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
