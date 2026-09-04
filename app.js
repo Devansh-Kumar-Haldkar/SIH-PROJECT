@@ -908,12 +908,56 @@ function bindEvents() {
     });
   });
 
-  document.getElementById('exportCsvBtn').addEventListener('click', () => {
-    window.location.href = `${API_BASE}/export/csv?lat=${state.lat}&lon=${state.lon}`;
+  document.getElementById('exportCsvBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('exportCsvBtn');
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = `<i data-lucide="loader-2" class="spin"></i> Exporting...`;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      // Try backend endpoint first
+      const resp = await fetch(`${API_BASE}/export/csv?lat=${state.lat}&lon=${state.lon}`);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        downloadBlob(blob, `oceanembed_profile_${state.lat}_${state.lon}.csv`);
+        return;
+      }
+      throw new Error(`Server returned status ${resp.status}`);
+    } catch (err) {
+      console.warn("Backend CSV export unavailable, generating client-side export:", err);
+      // Client-side fallback generation using current profile data
+      const data = state.currentProfileData || computeLocalPhysicsProfile(state.lat, state.lon);
+      const csvContent = generateClientCSV(data);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      downloadBlob(blob, `oceanembed_profile_${state.lat}_${state.lon}.csv`);
+    } finally {
+      btn.innerHTML = origHtml;
+      if (window.lucide) lucide.createIcons();
+    }
   });
 
-  document.getElementById('exportNcBtn').addEventListener('click', () => {
-    window.location.href = `${API_BASE}/export/netcdf?lat=${state.lat}&lon=${state.lon}`;
+  document.getElementById('exportNcBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('exportNcBtn');
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = `<i data-lucide="loader-2" class="spin"></i> Exporting...`;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      // Try backend NetCDF endpoint
+      const resp = await fetch(`${API_BASE}/export/netcdf?lat=${state.lat}&lon=${state.lon}`);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        downloadBlob(blob, `oceanembed_profile_${state.lat}_${state.lon}.nc`);
+        return;
+      }
+      throw new Error(`Server returned status ${resp.status}`);
+    } catch (err) {
+      console.warn("Backend NetCDF export unavailable:", err);
+      alert("NetCDF binary format (.nc) export requires the Python backend (uvicorn server.py:app) running at http://127.0.0.1:8000.\n\nTip: You can use 'CSV Table' export right now without the server!");
+    } finally {
+      btn.innerHTML = origHtml;
+      if (window.lucide) lucide.createIcons();
+    }
   });
 
   const modal = document.getElementById('docsModal');
@@ -936,4 +980,36 @@ function bindEvents() {
       renderVolumetricPlot(state.currentProfileData.vertical_profile);
     }
   });
+}
+
+function generateClientCSV(data) {
+  const meta = data.metadata || {};
+  const sm = data.surface_metrics || {};
+  const od = data.ocean_dynamics || {};
+  const profile = data.vertical_profile || [];
+
+  let csv = `# OceanEmbed Subsurface Profile Export (MoES SIH26066)\n`;
+  csv += `# Latitude: ${meta.latitude ?? state.lat}, Longitude: ${meta.longitude ?? state.lon}\n`;
+  csv += `# SST: ${sm.sst_celsius ?? '--'} C, SSH: ${sm.ssh_meters ?? '--'} m\n`;
+  csv += `# TCHP: ${od.tchp_kj_cm2 ?? '--'} kJ/cm^2\n`;
+  csv += `Depth_m,Predicted_Temperature_C,Argo_Benchmark_C,Uncertainty_Sigma_C\n`;
+
+  for (const row of profile) {
+    csv += `${row.depth},${row.temperature},${row.argo_ground_truth},${row.uncertainty_sigma}\n`;
+  }
+  return csv;
+}
+
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }, 100);
 }

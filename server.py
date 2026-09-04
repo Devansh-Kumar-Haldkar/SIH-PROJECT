@@ -9,6 +9,8 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(
     title="OceanEmbed AI & Subsurface Reconstruction Engine",
     description="MoES SIH26066: Reconstructing 3D subsurface ocean temperature profiles from 2D satellite observations.",
@@ -288,6 +290,68 @@ def export_csv(lat: float = Query(...), lon: float = Query(...)):
         headers={"Content-Disposition": f"attachment; filename=oceanembed_profile_{lat}_{lon}.csv"}
     )
 
+@app.get("/api/export/netcdf")
+def export_netcdf(lat: float = Query(...), lon: float = Query(...), date: Optional[str] = "2026-06-23"):
+    req = PredictRequest(lat=lat, lon=lon, date=date)
+    res = predict_subsurface(req)
+    
+    profile = res["vertical_profile"]
+    depth_vals = np.array([p["depth"] for p in profile], dtype=np.float32)
+    temp_vals = np.array([p["temperature"] for p in profile], dtype=np.float32).reshape(1, len(depth_vals), 1, 1)
+    unc_vals = np.array([p["uncertainty_sigma"] for p in profile], dtype=np.float32).reshape(1, len(depth_vals), 1, 1)
+    
+    try:
+        time_val = np.datetime64(date)
+    except Exception:
+        time_val = np.datetime64("2026-06-23")
+        
+    ds = xr.Dataset(
+        data_vars={
+            "thetao": (["time", "depth", "latitude", "longitude"], temp_vals, {
+                "long_name": "AI Reconstructed Ocean Potential Temperature",
+                "standard_name": "sea_water_potential_temperature",
+                "units": "degrees_C"
+            }),
+            "uncertainty": (["time", "depth", "latitude", "longitude"], unc_vals, {
+                "long_name": "1-Sigma Reconstruction Uncertainty",
+                "units": "degrees_C"
+            })
+        },
+        coords={
+            "depth": (["depth"], depth_vals, {"units": "m", "positive": "down", "standard_name": "depth"}),
+            "latitude": (["latitude"], np.array([lat], dtype=np.float32), {"units": "degrees_north", "standard_name": "latitude"}),
+            "longitude": (["longitude"], np.array([lon], dtype=np.float32), {"units": "degrees_east", "standard_name": "longitude"}),
+            "time": [time_val]
+        },
+        attrs={
+            "title": "OceanEmbed 3D Subsurface Ocean Temperature Reconstruction",
+            "institution": "Ministry of Earth Sciences (MoES), Government of India",
+            "project": "Smart India Hackathon (SIH 2026) - SIH26066",
+            "model": "Channel-to-Depth ResU-Net AI (0-2000m Depth Levels)",
+            "surface_sst": f"{res['surface_metrics']['sst_celsius']} degC",
+            "surface_ssh": f"{res['surface_metrics']['ssh_meters']} m",
+            "cyclone_tchp": f"{res['ocean_dynamics']['tchp_kj_cm2']} kJ/cm^2",
+            "d26_isotherm_depth": f"{res['ocean_dynamics']['d26_isotherm_depth_m']} m",
+            "conventions": "CF-1.8"
+        }
+    )
+    
+    nc_bytes = ds.to_netcdf()
+    ds.close()
+    
+    return StreamingResponse(
+        io.BytesIO(nc_bytes),
+        media_type="application/x-netcdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=oceanembed_profile_{lat}_{lon}.nc",
+            "Content-Type": "application/x-netcdf"
+        }
+    )
+
+# Mount current directory to serve HTML/JS/CSS frontend at root
+app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
