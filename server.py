@@ -391,7 +391,7 @@ def export_netcdf(lat: float = Query(...), lon: float = Query(...), date: Option
         }
     )
     
-    nc_bytes = bytes(ds.to_netcdf())
+    nc_bytes = bytes(ds.to_netcdf(engine="h5netcdf"))
     ds.close()
     
     return Response(
