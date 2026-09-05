@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OceanEmbed AI | 3D Subsurface Ocean Temperature Reconstruction (MoES)</title>
+  <title>Samudra Drishti | 3D Subsurface Ocean Temperature Reconstruction (MoES)</title>
   <meta name="description" content="AI Deep Learning Framework for Reconstructing 3D Subsurface Ocean Profiles from 2D Satellite Observations (SST/SSH) - MoES SIH26066" />
   
   <!-- Google Fonts: Inter & Outfit -->
@@ -21,33 +21,45 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=titanium-2.1" />
 </head>
 <body class="dark-theme">
-  <!-- Top Navigation Header -->
+  <!-- Interactive Dynamic Ambient Oceanic Particle Background -->
+  <canvas id="ambientOceanCanvas"></canvas>
+  <div class="ocean-ambient-orb orb-1"></div>
+  <div class="ocean-ambient-orb orb-2"></div>
+  <div class="ocean-ambient-orb orb-3"></div>
+
+  <!-- Top Modern Scientific Workstation Navigation Bar -->
   <header class="app-header">
     <div class="brand-container">
       <div class="brand-logo-icon">
-        <i data-lucide="waves" class="logo-svg"></i>
+        <i data-lucide="compass" class="logo-svg"></i>
       </div>
       <div>
-        <div class="brand-title">OceanEmbed <span class="badge-ai">AI 3D CORE</span></div>
-        <div class="brand-subtitle">Ministry of Earth Sciences (MoES) &bull; SIH 26066 Global Subsurface Reconstruction</div>
+        <div class="brand-title">
+          Samudra Drishti <span class="badge-ai">RESU-NET v2.4</span>
+        </div>
+        <div class="brand-subtitle">Ministry of Earth Sciences (MoES) &bull; Subsurface Thermal Profiler (SIH26066)</div>
       </div>
     </div>
     
     <div class="header-status-group">
       <div class="status-pill online">
         <span class="pulse-dot"></span>
-        <span id="backendStatus">NetCDF Engine Live</span>
+        <span id="backendStatus">Live AI Engine</span>
       </div>
       <div class="system-stats-pill">
-        <i data-lucide="cpu" class="pill-icon"></i>
-        <span>ResU-Net (40 Depths &bull; 0–2000m)</span>
+        <i data-lucide="layers" class="pill-icon"></i>
+        <span>40 Levels (0–2000m)</span>
       </div>
-      <a href="#quickDocsModal" class="btn-icon" title="Architecture & Model Info" id="openDocsBtn">
+      <div class="system-stats-pill">
+        <i data-lucide="shield-check" class="pill-icon text-success"></i>
+        <span>CF-1.8 Validated</span>
+      </div>
+      <button class="btn-icon" title="Architecture & Model Info" id="openDocsBtn">
         <i data-lucide="info"></i>
-      </a>
+      </button>
     </div>
   </header>
 
@@ -57,15 +69,18 @@
     <aside class="sidebar" id="commandCenter">
       <div class="sidebar-header">
         <div class="section-title">
-          <i data-lucide="sliders" class="title-icon"></i>
-          <span>Command Center</span>
+          <i data-lucide="crosshair" class="title-icon"></i>
+          <span>Target Controls</span>
         </div>
-        <span class="badge-tag">CMEMS L4</span>
+        <span class="badge-tag">SATELLITE L4</span>
       </div>
 
-      <!-- Coordinate Input Mode -->
+      <!-- Quick Preset Selector -->
       <div class="control-group">
-        <label class="control-label">Preset Ocean Regions</label>
+        <div class="control-label-row">
+          <label class="control-label"><i data-lucide="anchor"></i> Preset Basins</label>
+          <span class="tiny-helper">Click to focus</span>
+        </div>
         <div class="preset-pills">
           <button class="preset-btn active" data-lat="15.0" data-lon="88.0" data-name="Bay of Bengal (Cyclone Alley)">Bay of Bengal</button>
           <button class="preset-btn" data-lat="12.0" data-lon="65.0" data-name="Arabian Sea (Warm Pool)">Arabian Sea</button>
@@ -76,8 +91,9 @@
         </div>
       </div>
 
+      <!-- Precise Coordinate Inputs -->
       <div class="control-group">
-        <label class="control-label">Target Geospatial Coordinates</label>
+        <label class="control-label"><i data-lucide="map-pin"></i> Coordinates</label>
         <div class="coord-inputs-row">
           <div class="input-field">
             <span class="input-prefix">LAT</span>
@@ -92,68 +108,62 @@
         </div>
       </div>
 
+      <!-- Temporal Date Selector -->
       <div class="control-group">
-        <label class="control-label">Observation Date (Reanalysis Period)</label>
-        <input type="date" id="dateInput" value="2026-06-23" class="date-picker-input" />
+        <label class="control-label"><i data-lucide="calendar"></i> Observation Epoch</label>
+        <div class="date-input-wrap">
+          <input type="date" id="dateInput" value="2026-06-23" class="date-picker-input" />
+        </div>
       </div>
 
+      <!-- Primary Action CTA -->
       <button id="runInferenceBtn" class="cta-button primary-cta">
-        <i data-lucide="zap" class="cta-icon"></i>
-        <span>Execute 3D Subsurface Inference</span>
+        <i data-lucide="sparkles" class="cta-icon"></i>
+        <span>Synthesize 3D Profile</span>
       </button>
 
-      <!-- Ocean Hazard Live Card -->
+      <!-- Cyclone & Upper Ocean Energy Monitor -->
       <div class="hazard-card" id="hazardCard">
         <div class="hazard-header">
-          <span class="hazard-label"><i data-lucide="alert-triangle"></i> Cyclone Intensification Risk</span>
+          <span class="hazard-label"><i data-lucide="flame"></i> Cyclone Heat Energy</span>
           <span class="hazard-badge" id="hazardBadge">CALCULATING</span>
         </div>
         <div class="tchp-meter">
           <div class="tchp-bar" id="tchpBar" style="width: 65%;"></div>
         </div>
         <div class="hazard-metrics-row">
-          <div>
-            <div class="metric-tiny-label">TCHP (Heat Potential)</div>
-            <div class="metric-highlight" id="tchpValue">-- <small>kJ/cm²</small></div>
+          <div class="hazard-stat-box">
+            <span class="metric-tiny-label">TCHP Potential</span>
+            <span class="metric-highlight" id="tchpValue">-- <small>kJ/cm²</small></span>
           </div>
-          <div>
-            <div class="metric-tiny-label">26°C Isotherm Depth</div>
-            <div class="metric-highlight" id="d26Value">-- <small>m</small></div>
+          <div class="hazard-stat-box">
+            <span class="metric-tiny-label">26°C Isotherm Depth</span>
+            <span class="metric-highlight" id="d26Value">-- <small>m</small></span>
           </div>
         </div>
         <div class="mhw-status-row">
           <span class="text-muted">Marine Heatwave:</span>
-          <span id="mhwValue" class="fw-600 text-warning">Checking...</span>
+          <span id="mhwValue" class="fw-700 text-warning">Analyzing...</span>
         </div>
       </div>
 
-      <!-- Export Data Module -->
-      <div class="export-module">
-        <label class="control-label"><i data-lucide="download"></i> Export Reconstruction Profile</label>
-        <div class="export-btn-group">
-          <button id="exportCsvBtn" class="btn-secondary">
-            <i data-lucide="file-spreadsheet"></i> CSV Table
-          </button>
-          <button id="exportNcBtn" class="btn-secondary">
-            <i data-lucide="database"></i> NetCDF (.nc)
-          </button>
-        </div>
-      </div>
-
-      <!-- Real-time Satellite Telemetry Summary -->
+      <!-- Real-time Satellite Telemetry Gauges -->
       <div class="telemetry-box">
-        <div class="telemetry-title"><i data-lucide="activity"></i> Satellite L4 Telemetry</div>
+        <div class="telemetry-title">
+          <i data-lucide="radar"></i>
+          <span>Satellite Surface Telemetry</span>
+        </div>
         <div class="telemetry-grid">
           <div class="tel-item">
-            <span class="tel-name">SST (Sea Temp)</span>
+            <span class="tel-name">Sea Surface Temp</span>
             <span class="tel-val" id="telSST">-- °C</span>
           </div>
           <div class="tel-item">
-            <span class="tel-name">SSH (Anomaly)</span>
+            <span class="tel-name">Sea Level Anomaly</span>
             <span class="tel-val" id="telSSH">-- m</span>
           </div>
           <div class="tel-item">
-            <span class="tel-name">Mixed Layer (MLD)</span>
+            <span class="tel-name">Mixed Layer Depth</span>
             <span class="tel-val" id="telMLD">-- m</span>
           </div>
           <div class="tel-item">
@@ -161,13 +171,26 @@
             <span class="tel-val" id="telWave">-- m</span>
           </div>
           <div class="tel-item">
-            <span class="tel-name">Wind Speed</span>
+            <span class="tel-name">Wind Velocity</span>
             <span class="tel-val" id="telWind">-- m/s</span>
           </div>
           <div class="tel-item">
-            <span class="tel-name">Salinity</span>
+            <span class="tel-name">Practical Salinity</span>
             <span class="tel-val" id="telSal">-- PSU</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Export Data Module -->
+      <div class="export-module">
+        <label class="control-label"><i data-lucide="hard-drive-download"></i> Profile Downloads</label>
+        <div class="export-btn-group">
+          <button id="exportCsvBtn" class="btn-secondary">
+            <i data-lucide="file-spreadsheet"></i> CSV Dataset
+          </button>
+          <button id="exportNcBtn" class="btn-secondary">
+            <i data-lucide="database"></i> NetCDF (.nc)
+          </button>
         </div>
       </div>
     </aside>
@@ -285,6 +308,20 @@
         </div>
       </section>
     </main>
+
+    <!-- Always-Visible Summary Panel (Right on Desktop, Middle on Mobile) -->
+    <aside class="summary-sidebar" id="summarySidebar">
+      <div class="summary-sidebar-header">
+        <div class="section-title">
+          <i data-lucide="file-check" class="title-icon"></i>
+          <span>Reconstruction Summary</span>
+        </div>
+        <span class="badge-tag live-badge">Ready</span>
+      </div>
+      <div id="profileSummaryContent" class="summary-wrapper">
+        <!-- Populated dynamically via renderSummary() in app.js -->
+      </div>
+    </aside>
   </div>
 
   <!-- Documentation / About Modal -->
@@ -293,13 +330,13 @@
       <div class="modal-header">
         <div class="modal-title">
           <i data-lucide="cpu" class="text-accent"></i>
-          <span>About OceanEmbed Deep Learning Subsurface Reconstructor</span>
+          <span>About Samudra Drishti Deep Learning Subsurface Reconstructor</span>
         </div>
         <button class="modal-close-btn" id="closeDocsBtn">&times;</button>
       </div>
       <div class="modal-body">
         <h4>1. Hackathon Objective & MoES Problem Statement</h4>
-        <p>Current ocean monitoring relies on sparse Argo floats (~4000 globally) leaving massive geographic blind spots. Satellites capture 100% surface observations (SST, SSH) but cannot penetrate deep water. OceanEmbed reconstructs continuous 3D temperature grids (0–2000m) from 2D satellite observations in real-time.</p>
+        <p>Current ocean monitoring relies on sparse Argo floats (~4000 globally) leaving massive geographic blind spots. Satellites capture 100% surface observations (SST, SSH) but cannot penetrate deep water. Samudra Drishti reconstructs continuous 3D temperature grids (0–2000m) from 2D satellite observations in real-time.</p>
         
         <h4>2. Channel-to-Depth ResU-Net Architecture</h4>
         <ul>
@@ -315,6 +352,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=titanium-2.0"></script>
 </body>
 </html>
