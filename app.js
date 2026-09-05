@@ -339,16 +339,17 @@ function computeLocalPhysicsProfile(lat, lon) {
   });
 
   const tchp_kj = tchp / 1e7;
-  let risk = "LOW / SAFE (Low Subsurface Heat Reservoir)";
+  const wind_speed = 7.4;
+  let risk = "LOW / SAFE (Minimal Cyclone Genesis Potential)";
   let color = "#10b981";
-  if (tchp_kj > 80) {
-    risk = "CRITICAL (High Cyclone Intensification Potential)";
+  if (tchp_kj > 80 && wind_speed > 15.0) {
+    risk = "CRITICAL (Severe Cyclone Genesis & Rapid Intensification Alert)";
     color = "#ef4444";
-  } else if (tchp_kj > 50) {
+  } else if (tchp_kj > 60 && wind_speed > 12.0) {
     risk = "HIGH (Conducive to Severe Cyclonic Storms)";
     color = "#f97316";
-  } else if (tchp_kj > 20) {
-    risk = "MODERATE (Supports Tropical Depressions)";
+  } else if (tchp_kj > 40 || (tchp_kj > 25 && wind_speed > 10.0)) {
+    risk = "MODERATE (Supports Tropical Depression / Vortex Formation)";
     color = "#eab308";
   }
 
@@ -397,6 +398,10 @@ function updateUI(data) {
   document.getElementById('hazardBadge').style.borderColor = od.risk_color;
   document.getElementById('tchpValue').innerHTML = `${od.tchp_kj_cm2} <small>kJ/cm²</small>`;
   document.getElementById('d26Value').innerHTML = `${od.d26_isotherm_depth_m} <small>m</small>`;
+  const hazardWindEl = document.getElementById('hazardWindValue');
+  if (hazardWindEl) {
+    hazardWindEl.innerHTML = `${sm.surface_wind_speed_ms} <small>m/s</small>`;
+  }
   document.getElementById('mhwValue').innerText = od.marine_heatwave_status;
   
   const tchpPercent = Math.min(100, (od.tchp_kj_cm2 / 120) * 100);

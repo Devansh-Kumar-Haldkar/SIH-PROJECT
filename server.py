@@ -274,17 +274,18 @@ def predict_subsurface(req: PredictRequest):
         
     tchp_kj_cm2 = tchp_joules / 1e7
     
-    if tchp_kj_cm2 > 80:
-        cyclone_risk = "CRITICAL (High Cyclone Intensification Potential)"
+    # Combined Cyclone Genesis & Intensification Risk Index (TCHP + Surface Wind)
+    if tchp_kj_cm2 > 80 and wind_speed > 15.0:
+        cyclone_risk = "CRITICAL (Severe Cyclone Genesis & Rapid Intensification Alert)"
         risk_color = "#ef4444"
-    elif tchp_kj_cm2 > 50:
+    elif tchp_kj_cm2 > 60 and wind_speed > 12.0:
         cyclone_risk = "HIGH (Conducive to Severe Cyclonic Storms)"
         risk_color = "#f97316"
-    elif tchp_kj_cm2 > 20:
-        cyclone_risk = "MODERATE (Supports Tropical Depressions)"
+    elif tchp_kj_cm2 > 40 or (tchp_kj_cm2 > 25 and wind_speed > 10.0):
+        cyclone_risk = "MODERATE (Supports Tropical Depression / Vortex Formation)"
         risk_color = "#eab308"
     else:
-        cyclone_risk = "LOW / SAFE (Low Subsurface Heat Reservoir)"
+        cyclone_risk = "LOW / SAFE (Minimal Cyclone Genesis Potential)"
         risk_color = "#10b981"
         
     mhw_status = "Normal"
