@@ -1209,27 +1209,29 @@ function bindEvents() {
     if (window.lucide) lucide.createIcons();
 
     const filename = `samudra_drishti_profile_${state.lat}_${state.lon}.nc`;
-    const exportUrl = `${API_BASE}/export/netcdf?lat=${state.lat}&lon=${state.lon}`;
+    const exportUrl = `${API_BASE}/export/netcdf?lat=${state.lat}&lon=${state.lon}&date=${encodeURIComponent(state.date || '2026-06-23')}`;
 
     try {
       // 1. Try fetching blob via API
       const resp = await fetch(exportUrl);
       if (resp.ok) {
         const blob = await resp.blob();
-        downloadBlob(blob, filename);
+        downloadBlob(blob, filename, 'application/x-netcdf');
         return;
       }
       throw new Error(`Server returned HTTP ${resp.status}`);
     } catch (err) {
       console.warn("NetCDF fetch failed, falling back to direct browser navigation:", err);
       // Fallback: trigger browser download directly via URL navigation
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = exportUrl;
-      document.body.appendChild(iframe);
+      const a = document.createElement('a');
+      a.href = exportUrl;
+      a.download = filename;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
       setTimeout(() => {
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      }, 3000);
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 1000);
     } finally {
       setTimeout(() => {
         btn.innerHTML = origHtml;
@@ -1282,22 +1284,20 @@ function generateClientCSV(data) {
   return csv;
 }
 
-function downloadBlob(blob, filename) {
+function downloadBlob(blob, filename, mimeType) {
   try {
-    const url = window.URL.createObjectURL(blob);
+    const finalBlob = mimeType && blob.type !== mimeType ? new Blob([blob], { type: mimeType }) : blob;
+    const url = window.URL.createObjectURL(finalBlob);
     const a = document.createElement('a');
-    a.style.position = 'fixed';
-    a.style.top = '-1000px';
-    a.style.left = '-1000px';
+    a.style.display = 'none';
     a.href = url;
     a.download = filename;
-    a.setAttribute('download', filename);
     document.body.appendChild(a);
-    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    a.click();
     setTimeout(() => {
       window.URL.revokeObjectURL(url);
       if (a.parentNode) a.parentNode.removeChild(a);
-    }, 250);
+    }, 500);
   } catch (err) {
     console.error("Direct blob download failed, falling back to direct navigation:", err);
     window.open(url, '_blank');

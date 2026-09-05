@@ -13,7 +13,7 @@ except ImportError:
     HAS_TORCH = False
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 
@@ -391,15 +391,15 @@ def export_netcdf(lat: float = Query(...), lon: float = Query(...), date: Option
         }
     )
     
-    nc_bytes = ds.to_netcdf()
+    nc_bytes = bytes(ds.to_netcdf())
     ds.close()
     
-    return StreamingResponse(
-        io.BytesIO(nc_bytes),
+    return Response(
+        content=nc_bytes,
         media_type="application/x-netcdf",
         headers={
             "Content-Disposition": f"attachment; filename=samudra_drishti_profile_{lat}_{lon}.nc",
-            "Content-Type": "application/x-netcdf"
+            "Content-Length": str(len(nc_bytes))
         }
     )
 
