@@ -223,6 +223,17 @@
 
         <div class="map-container-wrapper">
           <div id="oceanMap" class="interactive-map"></div>
+          <!-- Friendly Land Mask Warning Banner -->
+          <div id="mapLandWarning" class="map-land-warning" style="display: none;">
+            <div class="land-warning-content">
+              <i data-lucide="alert-triangle" class="land-warning-icon"></i>
+              <div class="land-warning-text">
+                <strong id="landWarningTitle">Land Point Detected</strong>
+                <span id="landWarningMsg">Please select a point in the ocean. Deep-ocean subsurface inference is restricted to marine water bodies.</span>
+              </div>
+              <button class="land-warning-dismiss" id="dismissLandWarningBtn" aria-label="Dismiss warning">&times;</button>
+            </div>
+          </div>
           <!-- Floating Legend -->
           <div class="map-floating-legend">
             <span class="legend-title">Sea Surface Temp (°C)</span>
@@ -356,6 +367,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=titanium-2.0"></script>
+  <script src="land_mask_data.js"></script>
+  <script src="app.js?v=titanium-2.1"></script>
 </body>
 </html>

@@ -112,6 +112,68 @@ function initAmbientOceanCanvas() {
 }
 
 // ----------------------------------------------------
+// 0.1 High-Performance Geospatial Land-Mask Engine
+// ----------------------------------------------------
+function isPointOnLand(lat, lon) {
+  if (typeof LAND_POLYGONS === 'undefined' || !Array.isArray(LAND_POLYGONS)) {
+    return false;
+  }
+  let x = lon;
+  const y = lat;
+  while (x > 180) x -= 360;
+  while (x < -180) x += 360;
+
+  for (let i = 0; i < LAND_POLYGONS.length; i++) {
+    const entry = LAND_POLYGONS[i];
+    const bbox = entry[0]; // [min_x, max_x, min_y, max_y]
+    if (x < bbox[0] || x > bbox[1] || y < bbox[2] || y > bbox[3]) {
+      continue;
+    }
+    const ring = entry[1];
+    let inside = false;
+    const n = ring.length;
+    for (let j = 0; j < n; j++) {
+      const p1 = ring[j];
+      const p2 = ring[(j + 1) % n];
+      if ((p1[1] > y) !== (p2[1] > y)) {
+        if (x < ((p2[0] - p1[0]) * (y - p1[1])) / (p2[1] - p1[1]) + p1[0]) {
+          inside = !inside;
+        }
+      }
+    }
+    if (inside) return true;
+  }
+  return false;
+}
+
+let landWarningTimeout = null;
+function showLandWarning(lat, lon) {
+  const banner = document.getElementById('mapLandWarning');
+  const msg = document.getElementById('landWarningMsg');
+  const title = document.getElementById('landWarningTitle');
+  if (!banner) return;
+
+  const latStr = lat >= 0 ? `${lat.toFixed(2)}°N` : `${Math.abs(lat).toFixed(2)}°S`;
+  const lonStr = lon >= 0 ? `${lon.toFixed(2)}°E` : `${Math.abs(lon).toFixed(2)}°W`;
+
+  if (title) title.innerText = `Land Point Selected (${latStr}, ${lonStr})`;
+  if (msg) msg.innerText = `Please select a point in the ocean. Deep-ocean subsurface inference is restricted to marine water bodies.`;
+
+  banner.style.display = 'block';
+  if (window.lucide) lucide.createIcons();
+
+  if (landWarningTimeout) clearTimeout(landWarningTimeout);
+  landWarningTimeout = setTimeout(() => {
+    hideLandWarning();
+  }, 6000);
+}
+
+function hideLandWarning() {
+  const banner = document.getElementById('mapLandWarning');
+  if (banner) banner.style.display = 'none';
+}
+
+// ----------------------------------------------------
 // 1. Map & Geospatial Layer
 // ----------------------------------------------------
 function initLeafletMap() {
@@ -124,14 +186,15 @@ function initLeafletMap() {
     center: [state.lat, state.lon],
     zoom: 4,
     minZoom: 2,
-    maxZoom: 10,
+    maxZoom: 12,
     zoomControl: true
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; CARTO &bull; CMEMS Reanalysis',
-    subdomains: 'abcd',
-    maxZoom: 19
+  // Free high-definition English basemap: renders all countries, cities, and regions purely in English
+  // 100% public, zero API keys, and zero watermarks
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri &bull; OpenStreetMap contributors &bull; CMEMS Reanalysis'
   }).addTo(map);
 
   sstLayerGroup = L.layerGroup().addTo(map);
@@ -157,15 +220,39 @@ function initLeafletMap() {
 
   marker.on('dragend', (e) => {
     const pos = e.target.getLatLng();
-    updateCoordinates(pos.lat, pos.lng);
-    executeInference();
+    handleMapSelection(pos.lat, pos.lng);
   });
 
   map.on('click', (e) => {
-    updateCoordinates(e.latlng.lat, e.latlng.lng);
-    marker.setLatLng([state.lat, state.lon]);
-    executeInference();
+    handleMapSelection(e.latlng.lat, e.latlng.lng);
   });
+
+  // Bind warning dismiss button if present
+  const dismissBtn = document.getElementById('dismissLandWarningBtn');
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', hideLandWarning);
+  }
+}
+
+function handleMapSelection(lat, lon) {
+  const normLat = parseFloat(Number(lat).toFixed(2));
+  let normLon = parseFloat(Number(lon).toFixed(2));
+  while (normLon > 180) normLon -= 360;
+  while (normLon < -180) normLon += 360;
+  normLon = parseFloat(normLon.toFixed(2));
+
+  if (isPointOnLand(normLat, normLon)) {
+    showLandWarning(normLat, normLon);
+    // Reset marker to previous valid ocean coordinates
+    if (marker) marker.setLatLng([state.lat, state.lon]);
+    return;
+  }
+
+  // Point is on ocean/water - proceed with query
+  hideLandWarning();
+  updateCoordinates(normLat, normLon);
+  if (marker) marker.setLatLng([state.lat, state.lon]);
+  executeInference();
 }
 
 function updateCoordinates(lat, lon) {
@@ -254,6 +341,13 @@ function getSSTColor(t) {
 // 2. Inference Execution Engine
 // ----------------------------------------------------
 async function executeInference() {
+  // Validate coordinates before executing model
+  if (isPointOnLand(state.lat, state.lon)) {
+    showLandWarning(state.lat, state.lon);
+    return;
+  }
+  hideLandWarning();
+
   const btn = document.getElementById('runInferenceBtn');
   btn.disabled = true;
   btn.innerHTML = `<i data-lucide="loader-2" class="cta-icon spin"></i><span>Synthesizing 3D Subsurface Profile...</span>`;
@@ -275,6 +369,14 @@ async function executeInference() {
       });
       if (response.ok) {
         resultData = await response.json();
+      } else if (response.status === 400) {
+        // Land point detected by backend
+        const errJson = await response.json().catch(() => ({}));
+        showLandWarning(state.lat, state.lon);
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="zap" class="cta-icon"></i><span>Execute 3D Subsurface Inference</span>`;
+        if (window.lucide) lucide.createIcons();
+        return;
       }
     } catch (e) {}
 
@@ -1119,20 +1221,43 @@ function bindEvents() {
   });
 
   document.getElementById('latInput').addEventListener('change', (e) => {
-    state.lat = parseFloat(e.target.value);
+    const newLat = parseFloat(e.target.value);
+    if (isPointOnLand(newLat, state.lon)) {
+      showLandWarning(newLat, state.lon);
+      e.target.value = state.lat;
+      return;
+    }
+    hideLandWarning();
+    state.lat = newLat;
     if (marker) marker.setLatLng([state.lat, state.lon]);
     if (map) map.panTo([state.lat, state.lon]);
     updateCoordinates(state.lat, state.lon);
+    executeInference();
   });
 
   document.getElementById('lonInput').addEventListener('change', (e) => {
-    state.lon = parseFloat(e.target.value);
+    let newLon = parseFloat(e.target.value);
+    while (newLon > 180) newLon -= 360;
+    while (newLon < -180) newLon += 360;
+    newLon = parseFloat(newLon.toFixed(2));
+    if (isPointOnLand(state.lat, newLon)) {
+      showLandWarning(state.lat, newLon);
+      e.target.value = state.lon;
+      return;
+    }
+    hideLandWarning();
+    state.lon = newLon;
     if (marker) marker.setLatLng([state.lat, state.lon]);
     if (map) map.panTo([state.lat, state.lon]);
     updateCoordinates(state.lat, state.lon);
+    executeInference();
   });
 
   document.getElementById('runInferenceBtn').addEventListener('click', () => {
+    if (isPointOnLand(state.lat, state.lon)) {
+      showLandWarning(state.lat, state.lon);
+      return;
+    }
     executeInference();
   });
 
@@ -1214,24 +1339,36 @@ function bindEvents() {
     if (window.lucide) lucide.createIcons();
 
     const filename = `samudra_drishti_profile_${state.lat}_${state.lon}.nc`;
-    const exportUrl = `${API_BASE}/export/netcdf?lat=${state.lat}&lon=${state.lon}&date=${encodeURIComponent(state.date || '2026-06-23')}`;
+    const exportUrl = `${API_BASE}/export/netcdf?lat=${encodeURIComponent(state.lat)}&lon=${encodeURIComponent(state.lon)}&date=${encodeURIComponent(state.date || '2026-06-23')}`;
 
     try {
-      // 1. Try fetching blob via API
-      const resp = await fetch(exportUrl);
-      if (resp.ok) {
-        const blob = await resp.blob();
-        downloadBlob(blob, filename, 'application/x-netcdf');
-        return;
+      // 1. Fetch binary response blob from backend with explicit application/x-netcdf accept header
+      const resp = await fetch(exportUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/x-netcdf, application/octet-stream, */*'
+        }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Server returned HTTP ${resp.status}`);
       }
-      throw new Error(`Server returned HTTP ${resp.status}`);
+
+      const blobData = await resp.blob();
+      if (!blobData || blobData.size === 0) {
+        throw new Error('Received empty NetCDF payload');
+      }
+
+      // Enforce application/x-netcdf MIME type
+      const ncBlob = new Blob([blobData], { type: 'application/x-netcdf' });
+      downloadBlob(ncBlob, filename, 'application/x-netcdf');
     } catch (err) {
-      console.warn("NetCDF fetch failed, falling back to direct browser navigation:", err);
-      // Fallback: trigger browser download directly via URL navigation
+      console.warn("NetCDF fetch failed, falling back to direct browser navigation route:", err);
+      // Direct trigger of backend download route with query parameters
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = exportUrl;
-      a.download = filename;
-      a.target = '_blank';
+      a.setAttribute('download', filename);
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {

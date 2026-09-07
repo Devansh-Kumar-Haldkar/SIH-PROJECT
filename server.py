@@ -31,6 +31,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition", "Content-Length"]
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -167,6 +168,24 @@ def predict_subsurface(req: PredictRequest):
     
     if lon > 180:
         lon = lon - 360
+    elif lon < -180:
+        lon = lon + 360
+        
+    # Land Mask Verification: If CMEMS NetCDF is available, check if cell is on ocean/water
+    if os.path.exists(PHY_FILE):
+        try:
+            with xr.open_dataset(PHY_FILE) as ds_check:
+                sub_check = ds_check.sel(latitude=lat, longitude=lon, method="nearest")
+                raw_thetao = float(sub_check.thetao.values.squeeze())
+                if np.isnan(raw_thetao):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Selected coordinates fall on land. Deep-ocean subsurface inference is restricted to marine water bodies. Please select a point in the ocean."
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Land mask check warning: {e}")
         
     # Baseline fallback telemetry
     sst_val = 26.5
@@ -346,6 +365,7 @@ def export_csv(lat: float = Query(...), lon: float = Query(...)):
         headers={"Content-Disposition": f"attachment; filename=samudra_drishti_profile_{lat}_{lon}.csv"}
     )
 
+@app.get("/netcdf")
 @app.get("/api/export/netcdf")
 def export_netcdf(lat: float = Query(...), lon: float = Query(...), date: Optional[str] = "2026-06-23"):
     req = PredictRequest(lat=lat, lon=lon, date=date)
