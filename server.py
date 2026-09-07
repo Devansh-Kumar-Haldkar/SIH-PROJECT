@@ -1,6 +1,7 @@
 import os
 import io
 import math
+import tempfile
 import numpy as np
 import xarray as xr
 try:
@@ -11,9 +12,9 @@ except ImportError:
     torch = None
     nn = None
     HAS_TORCH = False
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, Response
+from fastapi.responses import StreamingResponse, JSONResponse, Response, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
 
@@ -367,7 +368,12 @@ def export_csv(lat: float = Query(...), lon: float = Query(...)):
 
 @app.get("/netcdf")
 @app.get("/api/export/netcdf")
-def export_netcdf(lat: float = Query(...), lon: float = Query(...), date: Optional[str] = "2026-06-23"):
+def export_netcdf(
+    background_tasks: BackgroundTasks,
+    lat: float = Query(...), 
+    lon: float = Query(...), 
+    date: Optional[str] = "2026-06-23"
+):
     req = PredictRequest(lat=lat, lon=lon, date=date)
     res = predict_subsurface(req)
     
@@ -412,16 +418,29 @@ def export_netcdf(lat: float = Query(...), lon: float = Query(...), date: Option
         }
     )
     
-    nc_bytes = bytes(ds.to_netcdf(engine="h5netcdf"))
+    # Write to a safe persistent temp file and return FileResponse to avoid stream drops
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".nc")
+    tmp_path = tmp.name
+    tmp.close()
+    
+    ds.to_netcdf(tmp_path)
     ds.close()
     
-    return Response(
-        content=nc_bytes,
+    filename = f"samudra_drishti_profile_{lat}_{lon}.nc"
+    
+    def cleanup_temp_file(path: str):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception as e:
+            print(f"Error cleaning up temp NetCDF file {path}: {e}")
+            
+    background_tasks.add_task(cleanup_temp_file, tmp_path)
+    
+    return FileResponse(
+        path=tmp_path,
         media_type="application/x-netcdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=samudra_drishti_profile_{lat}_{lon}.nc",
-            "Content-Length": str(len(nc_bytes))
-        }
+        filename=filename
     )
 
 app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
