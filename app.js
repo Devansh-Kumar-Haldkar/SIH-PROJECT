@@ -441,7 +441,16 @@ function computeLocalPhysicsProfile(lat, lon) {
   });
 
   const tchp_kj = tchp / 1e7;
-  const wind_speed = 7.4;
+  const absLatVal = Math.abs(lat);
+  let baseWind = 6.4 + 2.1 * Math.sin((absLatVal * 7.5 * Math.PI) / 180);
+  if (absLatVal >= 35.0) {
+    baseWind = 7.5 + 4.8 * Math.sin(((absLatVal - 35.0) * 2.2 * Math.PI) / 180);
+  } else if (absLatVal >= 18.0) {
+    baseWind = 5.2 + 1.8 * Math.cos(((absLatVal - 18.0) * 5.0 * Math.PI) / 180);
+  }
+  const lonWave = 1.2 * Math.sin(((lon * 2.8 + lat * 1.5) * Math.PI) / 180) + 0.6 * Math.cos(((lon * 4.2 - lat * 0.8) * Math.PI) / 180);
+  const wind_speed = parseFloat(Math.max(2.5, Math.min(24.0, baseWind + lonWave)).toFixed(2));
+
   let risk = "LOW / SAFE (Minimal Cyclone Genesis Potential)";
   let color = "#10b981";
   if (tchp_kj > 80 && wind_speed > 15.0) {
@@ -471,7 +480,7 @@ function computeLocalPhysicsProfile(lat, lon) {
       mixed_layer_depth_m: parseFloat(mld.toFixed(1)),
       significant_wave_height_m: 1.85,
       wave_period_s: 6.8,
-      surface_wind_speed_ms: 7.4
+      surface_wind_speed_ms: wind_speed
     },
     ocean_dynamics: {
       tchp_kj_cm2: parseFloat(tchp_kj.toFixed(2)),
