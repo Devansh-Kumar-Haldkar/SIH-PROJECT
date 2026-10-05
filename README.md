@@ -1,0 +1,1 @@
+The physical properties of the ocean surface are mathematically correlated with subsurface dynamics. By feeding historical 2D satellite observations and corresponding 3D physical sensor data into a Deep Learning framework he AI learns the complex, non-linear latent embeddings.
